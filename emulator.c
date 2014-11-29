@@ -46,6 +46,9 @@ float fresult;
 int *inst_p;
 int *inst_max;
 int *inst_base;
+int *data;
+int *data_max;
+int *base;
 
 int opcode(int instruction){
     return (instruction >> OPCODE_BS) & SIX_MASK;
@@ -226,7 +229,7 @@ void process_r(r_instruction inst){
                 // floating point
 
                 case 4:
-                    printf("%s", (uintptr_t) registers[4]); // print string at a0
+                    printf("%s", (uintptr_t) (base + registers[4])); // print string at a0
                     break;
 
                 case 5:
@@ -237,6 +240,10 @@ void process_r(r_instruction inst){
 
                 case 8:
                     fgets((char*) (uintptr_t) registers[4], registers[5], stdin); // Read a1 characters into pointer at a0
+                    break;
+
+                case 10:
+                    exit(0);
                     break;
 
                 case 11:
@@ -259,6 +266,7 @@ void process_r(r_instruction inst){
 }
 
 void process_j(j_instruction inst){
+    // printf("%x %d\n", inst.opcode, inst.address);
     switch(inst.opcode){
         case 0x2: // j
             inst_p += inst.address;
@@ -276,7 +284,7 @@ void process_j(j_instruction inst){
 }
 
 void process_i(i_instruction inst){
-    // printf("%d %d %d %d\n", inst.opcode, inst.rs, inst.rt, inst.immediate);
+    // printf("%x %d %d %d\n", inst.opcode, inst.rs, inst.rt, inst.immediate);
     switch(inst.opcode){
         case 0x8: // addi
             result = registers[inst.rs] + inst.immediate;
@@ -329,7 +337,7 @@ void process_i(i_instruction inst){
             break;
 
         case 0xf: // lui
-            *(&registers[inst.rt] + 2) = inst.immediate;
+            registers[inst.rt] = inst.immediate << 16;
             break;
 
         case 0xc: // andi
@@ -450,7 +458,25 @@ int main(int argc, char *argv[]){
     inst_p = instruction;
     inst_base = instruction;
     inst_max = inst_p + size/4;
-    // printf("inst_p = %p, inst_base=%p\n", inst_p, inst_base);
+
+    base = instruction;
+
+    data = instruction + 1;
+    data_max = inst_max;
+
+    while (inst_base < data_max){ // Find beginning of text section
+        if (*inst_base == 0x38000000){ // Beginning of text section
+            inst_base++;
+            break;
+        }
+        inst_base++;
+    }
+
+    data_max = inst_base - 1;
+    inst_p = inst_base;
+
+
+    // printf("data=%p, data_max=%p, inst_p = %p, inst_base=%p, inst_max=%p\n", data, data_max, inst_p, inst_base, inst_max);
     inst_loop();
 
     return 0;
