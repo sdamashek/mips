@@ -456,25 +456,12 @@ int main(int argc, char *argv[]){
     // printf("Allocated %d bytes at %p.\n", size, instruction);
     fread(instruction, 4, size/4, fp);
     inst_p = instruction;
-    inst_base = instruction;
     inst_max = inst_p + size/4;
 
     base = instruction;
 
     data = instruction + 1;
     data_max = inst_max;
-
-    while (inst_base < data_max){ // Find beginning of text section
-        if (*inst_base == 0x38000000){ // Beginning of text section
-            inst_base++;
-            break;
-        }
-        inst_base++;
-    }
-
-    data_max = inst_base - 1;
-    inst_p = inst_base;
-
 
     // printf("data=%p, data_max=%p, inst_p = %p, inst_base=%p, inst_max=%p\n", data, data_max, inst_p, inst_base, inst_max);
     inst_loop();
