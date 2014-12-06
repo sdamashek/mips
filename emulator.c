@@ -242,7 +242,6 @@ void process_r(r_instruction inst){
 
                 case 9:
                     registers[2] = (uintptr_t) malloc(registers[4]);
-                    printf("Allocated %u characters at %p.\n", registers[4], registers[2]);
                     break;
 
                 case 10:
