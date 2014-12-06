@@ -39,6 +39,7 @@ REG_MAP = {'zero':0,
 
 labels = {}
 offset = 0
+offset_regex = re.compile(r'(\d+)\(([^)]+)\)')
 
 def encode_instruction(inst):
     return struct.pack("<I", inst)
@@ -133,6 +134,40 @@ def register(reg):
 
     return REG_MAP[name]
 
+def parse_offset(offset):
+    ret = offset_regex.search(offset)
+    if not ret:
+        if offset.lower() in labels:
+            return (labels[offset.lower()],'$gp')
+        error("Invalid memory offset.")
+    return (int(ret.groups()[0]),ret.groups()[1])
+
+def tob10(st):
+    if st.startswith('0x'):
+        return int(st,16)
+    return int(st)
+
+def mul(d,s,t):
+    inst = b''
+    inst += make_r(0,0,s,t,0,0x18)
+    inst += make_r(0,d,0,0,0,0x12)
+    return inst
+
+def div(d,s,t):
+    inst = b''
+    inst += make_r(0,0,s,t,0,0x1a)
+    inst += make_r(0,d,0,0,0,0x12)
+    return inst
+
+def rem(d,s,t):
+    inst = b''
+    inst += make_r(0,0,s,t,0,0x1a)
+    inst += make_r(0,d,0,0,0,0x10)
+    return inst
+
+def valid(arr):
+    return [x for x in arr if x != None]
+
 def process_inst(inst):
     i = re.search(r'(\w+) ?([\$\w\d\.()]+)?(?: *, *([\$\w\d\.()]+))*$', inst)
     if not i:
@@ -143,8 +178,142 @@ def process_inst(inst):
     print(name)
     print(i[1:])
 
+    # R types
+
     if name == 'add':
         return make_r(0,register(i[1]),register(i[2]),register(i[3]),0,0x20)
+
+    elif name == 'addu':
+        return make_r(0,register(i[1]),register(i[2]),register(i[3]),0,0x21)
+
+    elif name == 'sub':
+        return make_r(0,register(i[1]),register(i[2]),register(i[3]),0,0x22)
+
+    elif name == 'subu':
+        return make_r(0,register(i[1]),register(i[2]),register(i[3]),0,0x23)
+
+    elif name == 'mult':
+        return make_r(0,0,register(i[1]),register(i[2]),0,0x18)
+
+    elif name == 'multu':
+        return make_r(0,0,register(i[1]),register(i[2]),0,0x19)
+
+    elif name == 'div':
+        return make_r(0,0,register(i[1]),register(i[2]),0,0x1a)
+
+    elif name == 'divu':
+        return make_r(0,0,register(i[1]),register(i[2]),0,0x1a)
+
+    elif name == 'mfhi':
+        return make_r(0,register(i[1]),0,0,0,0x10)
+
+    elif name == 'mflo':
+        return make_r(0,register(i[1]),0,0,0,0x12)
+
+    elif name == 'and':
+        return make_r(0,register(i[1]),register(i[2]),register(i[3]),0,0x24)
+
+    elif name == 'or':
+        return make_r(0,register(i[1]),register(i[2]),register(i[3]),0,0x25)
+
+    elif name == 'xor':
+        return make_r(0,register(i[1]),register(i[2]),register(i[3]),0,0x26)
+
+    elif name == 'nor':
+        return make_r(0,register(i[1]),register(i[2]),register(i[3]),0,0x27)
+
+    elif name == 'slt':
+        return make_r(0,register(i[1]),register(i[2]),register(i[3]),0,0x2a)
+
+    elif name == 'sll':
+        return make_r(0,register(i[1]),0,register(i[2]),i[3],0x0)
+
+    elif name == 'srl':
+        return make_r(0,register(i[1]),0,register(i[2]),i[3],0x2)
+
+    elif name == 'sra':
+        return make_r(0,register(i[1]),0,register(i[2]),i[3],0x3)
+
+    elif name == 'sllv':
+        return make_r(0,register(i[1]),register(i[3]),register(i[2]),0x4)
+
+    elif name == 'srlv':
+        return make_r(0,register(i[1]),register(i[3]),register(i[2]),0x6)
+
+    elif name == 'srav':
+        return make_r(0,register(i[1]),register(i[3]),register(i[2]),0x7)
+
+    elif name == 'jr':
+        return make_r(0,0,register(i[1]),0,0x8)
+
+    # I instructions
+
+    elif name == 'addi':
+        return make_i(0x8,register(i[2]),register(i[1]),i[3])
+
+    elif name == 'addiu':
+        return make_i(0x9,register(i[2]),register(i[1]),i[3])
+
+    elif name == 'lw':
+        off = parse_offset(i[2])
+        print(off)
+        return make_i(0x23,register(off[1]),register(i[1]),off[0])
+
+    elif name == 'lh':
+        off = parse_offset(i[2])
+        return make_i(0x21,register(off[1]),register(i[1]),off[0])
+
+    elif name == 'lhu':
+        off = parse_offset(i[2])
+        return make_i(0x25,register(off[1]),register(i[1]),off[0])
+
+    elif name == 'lb':
+        off = parse_offset(i[2])
+        return make_i(0x20,register(off[1]),register(i[1]),off[0])
+
+    elif name == 'lbu':
+        off = parse_offset(i[2])
+        return make_i(0x24,register(off[1]),register(i[1]),off[0])
+
+    elif name == 'sw':
+        off = parse_offset(i[2])
+        return make_i(0x2b,register(off[1]),register(i[1]),off[0])
+
+    elif name == 'sh':
+        off = parse_offset(i[2])
+        return make_i(0x29,register(off[1]),register(i[1]),off[0])
+
+    elif name == 'sb':
+        off = parse_offset(i[2])
+        return make_i(0x28,register(off[1]),register(i[1]),off[0])
+
+    elif name == 'lui':
+        return make_i(0xf,0,register(i[1]),i[2])
+
+    elif name == 'andi':
+        return make_i(0xc,register(i[1]),register(i[2]),i[3])
+
+    elif name == 'ori':
+        return make_i(0xd,register(i[1]),register(i[2]),i[3])
+
+    elif name == 'slti':
+        return make_i(0xa,register(i[1]),register(i[2]),i[3])
+
+    elif name == 'beq':
+        return make_i(0x4,register(i[1]),register(i[2]),i[3])
+
+    elif name == 'bne':
+        return make_i(0x5,register(i[1]),register(i[2]),i[3])
+
+    # J instructions
+
+    elif name == 'j':
+        return make_j(0x2,i[1])
+
+    elif name == 'jal':
+        return make_j(0x3,i[1])
+
+    # Pseudo instructions
 
     elif name == 'syscall':
         return syscall()
@@ -154,6 +323,26 @@ def process_inst(inst):
 
     elif name == 'la':
         return la(register(i[1]),i[2])
+
+    elif name == 'move':
+        return make_r(0,register(i[2]),0,register(i[1]),0,0x20)
+
+    elif name == 'clear':
+        return make_r(0,0,0,register(i[1]),0,0x20)
+
+    elif name == 'not':
+        return make_r(0,register(i[2]),0,register(i[1]),0,0x27)
+
+    elif name == 'b':
+        return make_i(0x4,0,0,labels[i[1].lower()])
+
+    elif name == 'mul':
+        return mul(register(i[1]),register(i[2]),register(i[3]))
+
+    elif name == 'nop':
+        return make_r(0,0,0,0,0,0)
+
+    error("Invalid instruction: %s" % i[0])
 
 def main():
     name = 'code.asm'
@@ -217,19 +406,82 @@ def main():
                 labelname = match.group(1)
                 typename = match.group(2)
                 vals = match.groups()[2:]
-                print(labelname,typename,vals)
 
-                if typename == '.asciiz':
-                    string = re.match(r'"([^"]*)"',vals[0])
-                    if not string:
-                        error("invalid asciiz")
-                    string = bytes(string.group(1),"utf-8").decode("unicode_escape")
-                    labels[labelname.lower()] = ptr 
-                    st = string + "\x00"
-                    st = st + ("\x00" * (4-(len(st) % 4)))
-                    print("FINAL: %s" % st)
-                    ptr += len(st)//4 - 1
-                    data += bytes(st,"utf-8")
+            else:
+                match = re.match(r'([\w\.]+) +([\$\w\d\.() \\"]+)(?: *, *([\$\w\d\.() \\"]+))*$',splinst)
+                if not match:
+                    continue
+
+                labelname = None
+                typename = match.group(1)
+                vals = match.groups()[1:]
+
+            print(labelname,typename,vals)
+
+            if typename == '.asciiz':
+                string = re.match(r'"([^"]*)"',vals[0])
+                if not string:
+                    error("invalid asciiz")
+                string = bytes(string.group(1),"utf-8").decode("unicode_escape")
+                labels[labelname.lower()] = ptr 
+                st = string + "\x00"
+                st = st + ("\x00" * (4-(len(st) % 4)))
+                print("FINAL: %s" % st)
+                ptr += len(st)//4 - 1
+                data += bytes(st,"utf-8")
+
+            elif typename == '.ascii':
+                string = re.match(r'"([^"]*)"',vals[0])
+                if not string:
+                    error("invalid ascii")
+                string = bytes(string.group(1),"utf-8").decode("unicode_escape")
+                labels[labelname.lower()] = ptr 
+                st = string
+                st = st + ("\x00" * (4-(len(st) % 4)))
+                print("FINAL: %s" % st)
+                ptr += len(st)//4 - 1
+                data += bytes(st,"utf-8")
+
+            elif typename == '.byte':
+                arr = valid(re.match(r'([\dx]+)(?: *, *([\dx]+))*$',vals[0]).groups())
+                if not arr:
+                    error("invalid bytes")
+                labels[labelname.lower()] = ptr 
+                arr = list(map(tob10, arr))
+                st = b''.join([struct.pack("<B",x) for x in arr])
+                st += st + (b"\x00" * (4-(len(st) % 4)))
+                ptr += len(st)//4 - 1
+                data += st
+
+            elif typename == '.halfword':
+                arr = valid(re.match(r'([\dx]+)(?: *, *([\dx]+))*$',vals[0]).groups())
+                if not arr:
+                    error("invalid halfword")
+                labels[labelname.lower()] = ptr 
+                arr = list(map(tob10, arr))
+                st = b''.join([struct.pack("<H",x) for x in arr])
+                st += st + (b"\x00" * (4-(len(st) % 4)))
+                ptr += len(st)//4 - 1
+                data += st
+
+            elif typename == '.word':
+                arr = valid(re.match(r'([\dx]+)(?: *, *([\dx]+))*$',vals[0]).groups())
+                if not arr:
+                    error("invalid word")
+                labels[labelname.lower()] = ptr 
+                arr = list(map(tob10, arr))
+                print(arr)
+                st = b''.join([struct.pack("<I",x) for x in arr])
+                st += st + (b"\x00" * (4-(len(st) % 4)))
+                ptr += len(st)//4 - 1
+                data += st
+
+            elif typename == '.space':
+                numbytes = int(vals[0])
+                st = bytes(numbytes)
+                st = st + (b"\x00" * (4-(len(st) % 4)))
+                ptr += len(st)//4 - 1
+                data += st
 
             
             ptr += 1

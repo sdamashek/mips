@@ -46,8 +46,6 @@ float fresult;
 int *inst_p;
 int *inst_max;
 int *inst_base;
-int *data;
-int *data_max;
 int *base;
 
 int opcode(int instruction){
@@ -242,6 +240,11 @@ void process_r(r_instruction inst){
                     fgets((char*) (uintptr_t) registers[4], registers[5], stdin); // Read a1 characters into pointer at a0
                     break;
 
+                case 9:
+                    registers[2] = (uintptr_t) malloc(registers[4]);
+                    printf("Allocated %u characters at %p.\n", registers[4], registers[2]);
+                    break;
+
                 case 10:
                     exit(0);
                     break;
@@ -298,42 +301,42 @@ void process_i(i_instruction inst){
             break;
 
         case 0x23: // lw
-            result = *(int*) (uintptr_t) (registers[inst.rs] + inst.immediate);
+            result = *(int*) (uintptr_t) (registers[inst.rs] + 4*inst.immediate);
             registers[inst.rt] = result;
             break;
 
         case 0x21: // lh
-            result = *(short*) (uintptr_t) (registers[inst.rs] + inst.immediate);
+            result = *(short*) (uintptr_t) (registers[inst.rs] + 4*inst.immediate);
             result = se_16_32(result);
             registers[inst.rt] = result;
             break;
 
         case 0x25: // lhu
-            result = *(short*) (uintptr_t) (registers[inst.rs] + inst.immediate);
+            result = *(short*) (uintptr_t) (registers[inst.rs] + 4*inst.immediate);
             registers[inst.rt] = result;
             break;
 
         case 0x20: // lb
-            result = *(char*) (uintptr_t) (registers[inst.rs] + inst.immediate);
+            result = *(char*) (uintptr_t) (registers[inst.rs] + 4*inst.immediate);
             result = se_8_32(result);
             registers[inst.rt] = result;
             break;
 
         case 0x24: // lbu
-            result = *(char*) (uintptr_t) (registers[inst.rs] + inst.immediate);
+            result = *(char*) (uintptr_t) (registers[inst.rs] + 4*inst.immediate);
             registers[inst.rt] = result;
             break;
 
         case 0x2b: // sw
-            *(int*) (uintptr_t) (registers[inst.rs] + inst.immediate) = registers[inst.rt];
+            *(int*) (uintptr_t) (registers[inst.rs] + 4*inst.immediate) = registers[inst.rt];
             break;
 
         case 0x29: // sh
-            *(short*) (uintptr_t) (registers[inst.rs] + inst.immediate) = (short) registers[inst.rt];
+            *(short*) (uintptr_t) (registers[inst.rs] + 4*inst.immediate) = (short) registers[inst.rt];
             break;
 
         case 0x28: // sb
-            *(char*) (uintptr_t) (registers[inst.rs] + inst.immediate) = (char) registers[inst.rt];
+            *(char*) (uintptr_t) (registers[inst.rs] + 4*inst.immediate) = (char) registers[inst.rt];
             break;
 
         case 0xf: // lui
@@ -460,10 +463,8 @@ int main(int argc, char *argv[]){
 
     base = instruction;
 
-    data = instruction + 1;
-    data_max = inst_max;
+    registers[28] = (uintptr_t) base;
 
-    // printf("data=%p, data_max=%p, inst_p = %p, inst_base=%p, inst_max=%p\n", data, data_max, inst_p, inst_base, inst_max);
     inst_loop();
 
     return 0;
